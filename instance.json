@@ -111,14 +111,9 @@
       "Type": "AWS::EC2::EIPAssociation",
       "Properties": {
         "AllocationId": {
-          "Fn::GetAtt": [
-            {
-              "Fn::ImportValue" : {
-                "Fn::Sub": "ap-EIP"
-              }
-            },
-            "AllocationId"
-          ]
+          "Fn::ImportValue": {
+            "Fn::Sub": "ap-EIP"
+          }
         },
         "InstanceId": {
           "Ref": "WebServerEc2Instance"

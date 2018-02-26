@@ -403,7 +403,7 @@
                   "StackName" : {
                     "Ref" : "StackName"
                   },
-                  "TemplatePath": "SourceArtifacts::cloudformation/instances.json"
+                  "TemplatePath": "SourceArtifacts::instance.json"
                 }
               }
             ]
@@ -717,7 +717,10 @@
         }
       },
       "Value" : {
-        "Ref" :"WebServerEc2Epi"
+        "Fn::GetAtt" : [
+          "WebServerEc2Epi",
+          "AllocationId"
+        ]
       }
     },
     "DataScience1SecurityGroup": {
