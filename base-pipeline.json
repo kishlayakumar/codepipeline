@@ -1,7 +1,7 @@
 {
   "Parameters": {
     "StackName" : {
-      "Description":"Name of stack to create or update"
+      "Description":"Name of stack to create or update",
       "Type":"String"
     },
     "GitHubOAuthToken": {
@@ -19,16 +19,12 @@
     "GitHubBranch":{
       "Description": "Enter the repository branch name that should be monitored for changes",
       "Type": "String"
-    }
+    },
     "SshKey": {
       "Description": "Amazon EC2 Key Pair",
       "Type": "AWS::EC2::KeyPair::KeyName"
     }
   },
-
-
-
-
   "Resources": {
     "ArtifactsS3Bucket": {
       "Type": "AWS::S3::Bucket",
@@ -37,6 +33,52 @@
         "VersioningConfiguration": {
           "Status": "Enabled"
         }
+      }
+    },
+    "CloudFormationIamPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "cloudformation:CreateStack",
+                "cloudformation:DeleteStack",
+                "cloudformation:DescribeStacks",
+                "cloudformation:UpdateStack",
+                "cloudformation:CreateChangeSet",
+                "cloudformation:DeleteChangeSet",
+                "cloudformation:DescribeChangeSet",
+                "cloudformation:ExecuteChangeSet",
+                "cloudformation:SetStackPolicy",
+                "cloudformation:ValidateTemplate",
+                "iam:PassRole"
+              ],
+              "Resource": "*"
+            }
+          ]
+        },
+        "PolicyName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "CodepilineCloudformation",
+              {
+                "Ref": "AWS::Region"
+              }
+            ]
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "CodePipelineCloudFormationRole"
+          }
+        ]
       }
     },
     "CodePipelineServiceRole": {
@@ -79,6 +121,19 @@
                 "cloudformation:ValidateTemplate",
                 "iam:PassRole"
               ],
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "iam:PassRole"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+            },
+            {
+              "Action": [
+                "iam:AssumeRole"
+              ],
               "Resource": "*",
               "Effect": "Allow"
             }
@@ -91,7 +146,7 @@
               {
                 "Ref": "AWS::StackName"
               },
-              "CodePipelineCodeCommitIamPolicy",
+              "CodePipelineIamPolicy",
               {
                 "Ref": "AWS::Region"
               }
@@ -155,68 +210,6 @@
               ]
             }
           ]
-        },
-        "Roles": [
-          {
-            "Ref": "CodePipelineServiceRole"
-          }
-        ]
-      }
-    },
-    "CodePipelineCodeDeployIamPolicy": {
-      "Type": "AWS::IAM::Policy",
-      "Properties": {
-        "PolicyName": {
-          "Fn::Join": [
-            "-",
-            [
-              {
-                "Ref": "AWS::StackName"
-              },
-              "CodePipelineCodeDeployIamPolicy",
-              {
-                "Ref": "AWS::Region"
-              }
-            ]
-          ]
-        },
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "codedeploy:CreateDeployment",
-                "codedeploy:GetApplicationRevision",
-                "codedeploy:GetDeployment",
-                "codedeploy:GetDeploymentConfig",
-                "codedeploy:RegisterApplicationRevision"
-              ],
-              "Resource": "*",
-              "Effect": "Allow"
-            },
-            {
-              "Action": [
-                "iam:PassRole"
-              ],
-              "Resource": "*",
-              "Effect": "Allow"
-            },
-            {
-              "Action": [
-                "iam:AssumeRole"
-              ],
-              "Resource": "*",
-              "Effect": "Allow"
-            },
-            {
-              "Action": [
-                "codebuild:BatchGetBuilds",
-                "codebuild:StartBuild"
-              ],
-              "Resource": "*",
-              "Effect": "Allow"
-            }
-          ],
-          "Version": "2012-10-17"
         },
         "Roles": [
           {
@@ -639,7 +632,7 @@
     "EIP" : {
       "Export" : {
         "Name" : {
-          "Fn::Sub": "${AWS::StackName}-EIP",
+          "Fn::Sub": "${AWS::StackName}-EIP"
         }
       },
       "Value" : {
@@ -658,6 +651,6 @@
           "GroupId"
         ]
       }
-    },
+    }
   }
 }
