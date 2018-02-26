@@ -74,7 +74,7 @@
         "SecurityGroupIds": [
           {
             "Fn::ImportValue": {
-              "Fn::Sub": "ap-EventStoreSecurityGroupId"
+              "Fn::Sub": "ap-SecurityGroupId"
             }
           }
         ],

@@ -723,7 +723,7 @@
         ]
       }
     },
-    "DataScience1SecurityGroup": {
+    "SecurityGroup": {
       "Export": {
         "Name": {
           "Fn::Sub": "${AWS::StackName}-SecurityGroupId"
