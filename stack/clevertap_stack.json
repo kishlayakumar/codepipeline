@@ -133,7 +133,7 @@
     },
     "RegionToAirportAmiMap": {
       "ap-south-1": {
-        "production": "ami-82a3d7ed"
+        "production": "ami-531a4c3c"
       },
       "eu-west-1": {
         "production": "ami-70edb016"
