@@ -275,19 +275,6 @@
         "LaunchConfigurationName": {
           "Ref": "LogCollectorv2LaunchConfiguration"
         },
-        "LoadBalancerNames": [
-          {
-            "Ref": "LogCollectorv2LoadBalancer"
-          },
-          {
-            "Ref": "WizrocketmailLoadBalancer"
-          }
-        ],
-        "TargetGroupARNs": [
-          {
-            "Ref": "LogCollectorElasticLoadBalancingV2TargetGroup"
-          }
-        ],
         "MaxSize": {
           "Ref": "MaxLogCollectorv2Instances"
         },

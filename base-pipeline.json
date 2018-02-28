@@ -515,7 +515,7 @@
                       ]
                     ]
                   },
-                  "TemplateConfiguration":"SourceArtifacts::stack/logcollector_json.json",
+                  "TemplateConfiguration":"SourceArtifacts::stack/logcollector_parameter.json",
                   "TemplatePath": "SourceArtifacts::stack/logcollector.json"
 
                 }
