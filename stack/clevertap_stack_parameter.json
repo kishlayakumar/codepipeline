@@ -1,0 +1,21 @@
+{
+  "Parameters": {
+    "VCPNetworkPrefix": "10.11",
+    "SshKey": "mumbai",
+    "RemoteWhitelistIp": "0.0.0.0/0",
+    "MinRemoteLogProcessorInstances": "0",
+    "DesiredRemoteLogProcessorInstances": "0",
+    "MaxRemoteLogProcessorInstances": "0",
+    "WizRocketDotNetPublicHostedZoneId": "KISHLAYA"
+  },
+  "StackPolicy" : {
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "NotAction" : "Update:Delete",
+        "Principal": "*",
+        "Resource" : "*"
+      }
+    ]
+  }
+}

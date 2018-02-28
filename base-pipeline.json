@@ -1,9 +1,5 @@
 {
   "Parameters": {
-    "StackName" : {
-      "Description":"Name of stack to create or update",
-      "Type":"String"
-    },
     "GitHubOAuthToken": {
       "Description": "Create a token with 'repo' and 'admin:repo_hook' permissions here https://github.com/settings/tokens",
       "Type": "String"
@@ -25,6 +21,16 @@
       "Type": "AWS::EC2::KeyPair::KeyName"
     }
   },
+  "Mappings": {
+    "RegionToStackNameMap": {
+      "eu-west": {
+        "production": "eu1"
+      },
+      "ap-south-1": {
+        "production": "in1"
+      }
+    }
+  },
   "Resources": {
     "ArtifactsS3Bucket": {
       "Type": "AWS::S3::Bucket",
@@ -43,19 +49,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Action": [
-                "cloudformation:CreateStack",
-                "cloudformation:DeleteStack",
-                "cloudformation:DescribeStacks",
-                "cloudformation:UpdateStack",
-                "cloudformation:CreateChangeSet",
-                "cloudformation:DeleteChangeSet",
-                "cloudformation:DescribeChangeSet",
-                "cloudformation:ExecuteChangeSet",
-                "cloudformation:SetStackPolicy",
-                "cloudformation:ValidateTemplate",
-                "iam:PassRole"
-              ],
+              "Action": "*",
               "Resource": "*"
             }
           ]
@@ -235,8 +229,6 @@
         ]
       }
     },
-
-
     "CodePipelineArtifactsS3BucketIamPolicy": {
       "Type": "AWS::IAM::Policy",
       "Properties": {
@@ -295,9 +287,6 @@
         ]
       }
     },
-
-
-
     "CodePipelineCloudFormationRole" : {
       "Type":"AWS::IAM::Role",
       "Properties": {
@@ -317,10 +306,7 @@
         "Path": "/"
       }
     },
-
-
-
-    "CodePipeline": {
+    "CodePipelineMasterTemplate": {
       "Type": "AWS::CodePipeline::Pipeline",
       "Properties": {
         "Name": {
@@ -398,12 +384,19 @@
                 "RunOrder": 1,
                 "Configuration": {
                   "ActionMode" : "CREATE_UPDATE",
-                  "RoleArn" : "arn:aws:iam::527343544753:role/iampassroleformation",
+                  "RoleArn" : {
+                    "Fn::GetAtt": [
+                      "CodePipelineCloudFormationRole",
+                      "Arn"
+                    ]
+                  },
                   "Capabilities" : "CAPABILITY_NAMED_IAM",
                   "StackName" : {
                     "Ref" : "StackName"
                   },
-                  "TemplatePath": "SourceArtifacts::instance.json"
+                  "TemplateConfiguration""SourceArtifacts::stack/"
+                  "TemplatePath": "SourceArtifacts::stack/clevertap_stack.json"
+
                 }
               }
             ]
@@ -415,267 +408,6 @@
             "Ref": "ArtifactsS3Bucket"
           }
         }
-      }
-    },
-    "Vpc": {
-      "Type": "AWS::EC2::VPC",
-      "Properties": {
-        "CidrBlock": "10.10.0.0/16",
-        "EnableDnsSupport": true,
-        "EnableDnsHostnames": true,
-        "InstanceTenancy": "default"
-      }
-    },
-    "InternetGateway": {
-      "Type": "AWS::EC2::InternetGateway",
-      "Properties": {
-      }
-    },
-    "VpcGatewayAttachment": {
-      "Type": "AWS::EC2::VPCGatewayAttachment",
-      "Properties": {
-        "InternetGatewayId": {
-          "Ref": "InternetGateway"
-        },
-        "VpcId": {
-          "Ref": "Vpc"
-        }
-      }
-    },
-    "RouteTableIgw": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Vpc"
-        }
-      }
-    },
-    "PublicSubnet": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "AvailabilityZone": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "AWS::Region"
-              },
-              "a"
-            ]
-          ]
-        },
-        "CidrBlock": "10.10.1.0/24",
-        "MapPublicIpOnLaunch": false,
-        "VpcId": {
-          "Ref": "Vpc"
-        }
-      }
-    },
-    "RouteTableIgwRouteWorld": {
-      "Type": "AWS::EC2::Route",
-      "DependsOn": [
-        "InternetGateway",
-        "VpcGatewayAttachment"
-      ],
-      "Properties": {
-        "RouteTableId": {
-          "Ref": "RouteTableIgw"
-        },
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "GatewayId": {
-          "Ref": "InternetGateway"
-        }
-      }
-    },
-    "PublicSubnetRouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "RouteTableId": {
-          "Ref": "RouteTableIgw"
-        },
-        "SubnetId": {
-          "Ref": "PublicSubnet"
-        }
-      }
-    },
-    "WebServerEc2ServiceRole": {
-      "Type": "AWS::IAM::Role",
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "ec2.amazonaws.com"
-                ]
-              },
-              "Action": "sts:AssumeRole"
-            }
-          ]
-        },
-        "Path": "/"
-      }
-    },
-    "WebServerEc2ArtifactsS3BucketIamPolicy": {
-      "Type": "AWS::IAM::Policy",
-      "Properties": {
-        "PolicyName": {
-          "Fn::Join": [
-            "-",
-            [
-              {
-                "Ref": "AWS::StackName"
-              },
-              "WebserverArtifactsS3BucketIamPolicy",
-              {
-                "Ref": "AWS::Region"
-              }
-            ]
-          ]
-        },
-        "PolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "ArtifactsS3Bucket",
-                    "Arn"
-                  ]
-                },
-                {
-                  "Fn::Join": [
-                    "/",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "ArtifactsS3Bucket",
-                          "Arn"
-                        ]
-                      },
-                      "*"
-                    ]
-                  ]
-                }
-              ],
-              "Action": [
-                "s3:Get*",
-                "s3:List*"
-              ]
-            }
-          ]
-        },
-        "Roles": [
-          {
-            "Ref": "WebServerEc2ServiceRole"
-          }
-        ]
-      }
-    },
-    "WebServerEc2EcrIamPolicy": {
-      "Type": "AWS::IAM::Policy",
-      "Properties": {
-        "PolicyName": {
-          "Fn::Join": [
-            "-",
-            [
-              {
-                "Ref": "AWS::StackName"
-              },
-              "WebserverEcrIamPolicy",
-              {
-                "Ref": "AWS::Region"
-              }
-            ]
-          ]
-        },
-        "PolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Action": [
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:GetRepositoryPolicy",
-                "ecr:DescribeRepositories",
-                "ecr:ListImages",
-                "ecr:BatchGetImage"
-              ],
-              "Resource": "*",
-              "Effect": "Allow"
-            }
-          ]
-        },
-        "Roles": [
-          {
-            "Ref": "WebServerEc2ServiceRole"
-          }
-        ]
-      }
-    },
-    "WebserverEc2IamInstanceProfile": {
-      "Type": "AWS::IAM::InstanceProfile",
-      "Properties": {
-        "Roles": [
-          {
-            "Ref": "WebServerEc2ServiceRole"
-          }
-        ],
-        "InstanceProfileName": {
-          "Fn::Join": [
-            "-",
-            [
-              {
-                "Ref": "AWS::StackName"
-              },
-              "WebserverEc2IamInstanceProfile",
-              {
-                "Ref": "AWS::Region"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "WebServerEc2Epi": {
-      "Type": "AWS::EC2::EIP",
-      "Properties": {
-        "Domain": "vpc"
-      }
-    },
-    "WebServerEc2SecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
-      "Properties": {
-        "GroupDescription": "WebServer security group",
-        "VpcId": {
-          "Ref": "Vpc"
-        },
-        "SecurityGroupIngress": [
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "22",
-            "ToPort": "22",
-            "CidrIp": "0.0.0.0/0"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "80",
-            "ToPort": "80",
-            "CidrIp": "0.0.0.0/0"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "443",
-            "ToPort": "443",
-            "CidrIp": "0.0.0.0/0"
-          }
-        ]
       }
     }
   },
