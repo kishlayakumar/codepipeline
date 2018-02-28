@@ -426,6 +426,7 @@
                 "Ref": "AWS::StackName"
               },
               "CodePipeline",
+              "logcollector",
               {
                 "Ref": "AWS::Region"
               }
@@ -501,7 +502,18 @@
                   },
                   "Capabilities" : "CAPABILITY_NAMED_IAM",
                   "StackName" : {
-                    "Ref" : "StackName"
+                    "Fn::Join": [
+                      "-",
+                      [
+                        {
+                          "Ref": "StackName"
+                        },
+                        "logcollector",
+                        {
+                          "Ref": "AWS::Region"
+                        }
+                      ]
+                    ]
                   },
                   "TemplateConfiguration":"SourceArtifacts::stack/logcollector_json.json",
                   "TemplatePath": "SourceArtifacts::stack/logcollector.json"
