@@ -19,6 +19,11 @@
     "SshKey": {
       "Description": "Amazon EC2 Key Pair",
       "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "StackName" : {
+      "Description": "Name of the stack that this stack references for networking and shared resources",
+      "Default": "",
+      "Type": "String"
     }
   },
   "Mappings": {
@@ -394,7 +399,7 @@
                   "StackName" : {
                     "Ref" : "StackName"
                   },
-                  "TemplateConfiguration""SourceArtifacts::stack/"
+                  "TemplateConfiguration":"SourceArtifacts::stack/clevertap_stack_parameter.json",
                   "TemplatePath": "SourceArtifacts::stack/clevertap_stack.json"
 
                 }
@@ -410,64 +415,5 @@
         }
       }
     }
-  },
-  "Outputs":{
-    "SshKey": {
-      "Export": {
-        "Name": {
-          "Fn::Sub": "${AWS::StackName}-SshKey"
-        }
-      },
-      "Value": {
-        "Ref": "SshKey"
-      }
-    },
-    "InstanceIamProfile": {
-      "Export": {
-        "Name": {
-          "Fn::Sub": "${AWS::StackName}-WebserverEc2IamInstanceProfile"
-        }
-      },
-      "Value": {
-        "Ref": "WebserverEc2IamInstanceProfile"
-      }
-    },
-    "PublicSubnet":{
-      "Export":{
-        "Name" : {
-          "Fn::Sub": "${AWS::StackName}-PublicSubnet"
-        }
-      },
-      "Value":{
-        "Ref":"PublicSubnet"
-      }
-    },
-    "EIP" : {
-      "Export" : {
-        "Name" : {
-          "Fn::Sub": "${AWS::StackName}-EIP"
-        }
-      },
-      "Value" : {
-        "Fn::GetAtt" : [
-          "WebServerEc2Epi",
-          "AllocationId"
-        ]
-      }
-    },
-    "SecurityGroup": {
-      "Export": {
-        "Name": {
-          "Fn::Sub": "${AWS::StackName}-SecurityGroupId"
-        }
-      },
-      "Value": {
-        "Fn::GetAtt": [
-          "WebServerEc2SecurityGroup",
-          "GroupId"
-        ]
-      }
-    }
   }
-
 }
