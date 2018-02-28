@@ -1,0 +1,561 @@
+{
+  "Parameters": {
+    "NetworkStack": {
+      "Description": "Name of the stack that this stack references for networking and shared resources",
+      "Default": "",
+      "Type": "String"
+    },
+    "SshKey": {
+      "Description": "Amazon EC2 Key Pair for EC2 instances",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "LogCollectorv2InstanceType": {
+      "Type": "String",
+      "Default": "c4.large",
+      "AllowedValues": [
+        "t2.small",
+        "t2.medium",
+        "t2.large",
+        "t2.xlarge",
+        "t2.2xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge"
+      ],
+      "Description": "Logcollector EC2 instance type"
+    },
+    "MinLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "DesiredLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "MaxLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "100"
+    }
+  },
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Stack Configuration"
+          },
+          "Parameters": [
+            "NetworkStack",
+            "SshKey"
+          ]
+        },
+        {
+          "Label": {
+            "default": "LogCollector autoscaling configuration"
+          },
+          "Parameters": [
+            "LogCollectorv2InstanceType",
+            "MinLogCollectorv2Instances",
+            "DesiredLogCollectorv2Instances",
+            "MaxLogCollectorv2Instances"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "VCPNetworkPrefix": {
+          "default": "Upstream stack name"
+        },
+        "SshKey": {
+          "default": "Default SSH key to associate with instances"
+        },
+        "LogCollectorv2InstanceType": {
+          "default": "LogCollector Instance type"
+        },
+        "MinLogCollectorv2Instances": {
+          "default": "Minimum # of instances"
+        },
+        "DesiredLogCollectorv2Instances": {
+          "default": "Desired # of instances"
+        },
+        "MaxLogCollectorv2Instances": {
+          "default": "Maximum # of instances"
+        }
+      }
+    }
+  },
+  "Mappings": {
+    "RegionToLogCollectorv2AmiMap": {
+      "ap-south-1": {
+        "production": "ami-f9daac96"
+      },
+      "eu-west-1": {
+        "production": "ami-70edb016"
+      }
+    },
+    "RegionToLogCollectorv2CertificateMap": {
+      "ap-south-1": {
+        "in1": "arn:aws:acm:ap-south-1:062484260092:certificate/af87f2b4-f246-4cc6-8b15-74aabd724b58"
+      },
+      "eu-west-1": {
+        "eu1": "arn:aws:iam::062484260092:server-certificate/wzrkt.com.ecc.09-11-2017"
+      }
+    },
+    "RegionToWizrocketmailDomainMap": {
+      "ap-south-1": {
+        "in1": "in.wizrocketmail.com"
+      },
+      "eu-west-1": {
+        "eu1": "wizrocketmail.com"
+      }
+    },
+    "RegionToAlbWzrktDomainMap": {
+      "ap-south-1": {
+        "in1": "in1.alb.wzrkt.com"
+      },
+      "eu-west-1": {
+        "eu1": "eu1.alb.wzrkt.com"
+      }
+    },
+    "RegionToWizrocketmailValidationDomainMap": {
+      "ap-south-1": {
+        "in1": "wizrocketmail.com"
+      },
+      "eu-west-1": {
+        "eu1": "wizrocketmail.com"
+      }
+    }
+  },
+  "Resources": {
+    "LogCollectorv2Subnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              "a"
+            ]
+          ]
+        },
+        "CidrBlock": {
+          "Fn::Join": [
+            ".",
+            [
+              {
+                "Fn::ImportValue": {
+                  "Fn::Sub": "${NetworkStack}-VpcNetworkPrefix"
+                }
+              },
+              "240.0/20"
+            ]
+          ]
+        },
+        "MapPublicIpOnLaunch": false,
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-VpcId"
+          }
+        }
+      }
+    },
+    "LogCollectorv2SubnetRouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-RouteTableNatId"
+          }
+        },
+        "SubnetId": {
+          "Ref": "LogCollectorv2Subnet"
+        }
+      }
+    },
+    "LogCollectorv2LaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "services": {
+            "sysvinit": {
+              "codedeploy-agent": {
+                "enabled": "true",
+                "ensureRunning": "true"
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "AssociatePublicIpAddress": false,
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionToLogCollectorv2AmiMap",
+            {
+              "Ref": "AWS::Region"
+            },
+            "production"
+          ]
+        },
+        "IamInstanceProfile": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CdAndEcrInstanceIamProfile"
+          }
+        },
+        "InstanceMonitoring": true,
+        "InstanceType": {
+          "Ref": "LogCollectorv2InstanceType"
+        },
+        "KeyName": {
+          "Ref": "SshKey"
+        },
+        "SecurityGroups": [
+          {
+            "Fn::ImportValue": {
+              "Fn::Sub": "${NetworkStack}-LogCollectorv2InstanceSecurityGroupId"
+            }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash -ex\n",
+                "echo 'logcollector' > /etc/node_profile\n",
+                "echo '",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "' > /etc/cfn_stackname\n",
+                "yum update -y aws-cfn-bootstrap\n",
+                "yum install -y aws-cli\n",
+                "yum install -y ruby \n",
+                "yum install -y wget \n",
+                "# Install the AWS CodeDeploy Agent.\n",
+                "cd /home/ec2-user/\n",
+                "wget https://aws-codedeploy-ap-south-1.s3.amazonaws.com/latest/install \n",
+                "chmod +x ./install \n",
+                "./install auto \n",
+                "/opt/aws/bin/cfn-init --stack ",
+                {
+                  "Ref": "AWS::StackId"
+                },
+                " --resource LogCollectorv2LaunchConfiguration ",
+                " --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "LogCollectorv2AutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "Cooldown": 300,
+        "DesiredCapacity": {
+          "Ref": "DesiredLogCollectorv2Instances"
+        },
+        "HealthCheckGracePeriod": 60,
+        "HealthCheckType": "EC2",
+        "LaunchConfigurationName": {
+          "Ref": "LogCollectorv2LaunchConfiguration"
+        },
+        "LoadBalancerNames": [
+          {
+            "Ref": "LogCollectorv2LoadBalancer"
+          },
+          {
+            "Ref": "WizrocketmailLoadBalancer"
+          }
+        ],
+        "TargetGroupARNs": [
+          {
+            "Ref": "LogCollectorElasticLoadBalancingV2TargetGroup"
+          }
+        ],
+        "MaxSize": {
+          "Ref": "MaxLogCollectorv2Instances"
+        },
+        "MinSize": {
+          "Ref": "MinLogCollectorv2Instances"
+        },
+        "MetricsCollection": [
+          {
+            "Granularity": "1Minute",
+            "Metrics": []
+          }
+        ],
+        "TerminationPolicies": [
+          "NewestInstance"
+        ],
+        "VPCZoneIdentifier": [
+          {
+            "Ref": "LogCollectorv2Subnet"
+          }
+        ]
+      }
+    },
+    "LogCollectorv2AutoScalingCloudWatchAlarmCpuHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "ActionsEnabled": true,
+        "AlarmActions": [
+          {
+            "Ref": "LogCollectorv2AutoScalingScaleUpPolicy"
+          }
+        ],
+        "AlarmDescription": "Alarm if CPU too high or metric disappears indicating instance is down",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "LogCollectorv2AutoScalingGroup"
+            }
+          }
+        ],
+        "EvaluationPeriods": "5",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "60",
+        "Threshold": "40"
+      }
+    },
+    "LogCollectorv2AutoScalingCloudWatchAlarmCpuLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "ActionsEnabled": true,
+        "AlarmActions": [
+          {
+            "Ref": "LogCollectorv2AutoScalingScaleDownPolicy"
+          }
+        ],
+        "AlarmDescription": "Alarm if CPU is too low or metric disappears indicating instance is down",
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "LogCollectorv2AutoScalingGroup"
+            }
+          }
+        ],
+        "EvaluationPeriods": "10",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "60",
+        "Threshold": "20"
+      }
+    },
+    "LogCollectorv2AutoScalingScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "LogCollectorv2AutoScalingGroup"
+        },
+        "Cooldown": "300",
+        "ScalingAdjustment": "2"
+      }
+    },
+    "LogCollectorv2AutoScalingScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "LogCollectorv2AutoScalingGroup"
+        },
+        "Cooldown": "300",
+        "ScalingAdjustment": "-1"
+      }
+    },
+    "LogCollectorv2CodeDeployApplication": {
+      "Type": "AWS::CodeDeploy::Application",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              {
+                "Ref": "AWS::Region"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "LogCollectorv2CodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {
+          "Ref": "LogCollectorv2CodeDeployApplication"
+        },
+        "AutoScalingGroups": [
+          {
+            "Ref": "LogCollectorv2AutoScalingGroup"
+          }
+        ],
+        "DeploymentConfigName": "CodeDeployDefault.OneAtATime",
+        "DeploymentGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              {
+                "Ref": "AWS::Region"
+              },
+              "fleet"
+            ]
+          ]
+        },
+        "ServiceRoleArn": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CodeDeployTrustIamRoleArn"
+          }
+        }
+      }
+    },
+    "LogCollectorv2SensuCodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-sensu-SensuServerv3CodeDeployApplicationName"
+          }
+        },
+        "AutoScalingGroups": [
+          {
+            "Ref": "LogCollectorv2AutoScalingGroup"
+          }
+        ],
+        "DeploymentConfigName": "CodeDeployDefault.OneAtATime",
+        "DeploymentGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "sensu",
+              {
+                "Ref": "AWS::Region"
+              },
+              "fleet"
+            ]
+          ]
+        },
+        "ServiceRoleArn": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CodeDeployTrustIamRoleArn"
+          }
+        }
+      }
+    },
+    "LogCollectorv2ChefCodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-sharedservices-Chefv2CodeDeployApplicationName"
+          }
+        },
+        "AutoScalingGroups": [
+          {
+            "Ref": "LogCollectorv2AutoScalingGroup"
+          }
+        ],
+        "DeploymentConfigName": "CodeDeployDefault.OneAtATime",
+        "DeploymentGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "chef",
+              {
+                "Ref": "AWS::Region"
+              },
+              "fleet"
+            ]
+          ]
+        },
+        "ServiceRoleArn": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CodeDeployTrustIamRoleArn"
+          }
+        }
+      }
+    },
+    "LogCollectorv2SplunkCodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-sharedservices-SplunkForwarderCodeDeployApplicationName"
+          }
+        },
+        "AutoScalingGroups": [
+          {
+            "Ref": "LogCollectorv2AutoScalingGroup"
+          }
+        ],
+        "DeploymentConfigName": "CodeDeployDefault.OneAtATime",
+        "DeploymentGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "splunk",
+              {
+                "Ref": "AWS::Region"
+              },
+              "fleet"
+            ]
+          ]
+        },
+        "ServiceRoleArn": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CodeDeployTrustIamRoleArn"
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "LogCollectorv2AutoScalingGroupName": {
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-LogCollectorv2AutoScalingGroupName"
+        }
+      },
+      "Value": {
+        "Ref": "LogCollectorv2AutoScalingGroup"
+      }
+    }
+  }
+}
