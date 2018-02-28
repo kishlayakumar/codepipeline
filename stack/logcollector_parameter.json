@@ -1,6 +1,6 @@
 {
   "Parameters": {
-    "NetworkStack": "in1",
+    "NetworkStack": "in2",
     "SshKey": "mumbai",
     "LogCollectorv2InstanceType": "t2.small",
     "MinLogCollectorv2Instances": "0",
