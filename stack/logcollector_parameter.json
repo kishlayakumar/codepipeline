@@ -2,7 +2,7 @@
   "Parameters": {
     "NetworkStack": "in1",
     "SshKey": "mumbai",
-    "LogCollectorv2InstanceType": "t2.nano",
+    "LogCollectorv2InstanceType": "t2.small",
     "MinLogCollectorv2Instances": "0",
     "DesiredLogCollectorv2Instances": "0",
     "MaxLogCollectorv2Instances": "0"
