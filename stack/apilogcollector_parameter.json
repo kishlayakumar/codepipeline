@@ -1,0 +1,20 @@
+{
+  "Parameters": {
+    "NetworkStack": "in2",
+    "SshKey": "mumbai",s
+    "ApiLogCollectorv2InstanceType": "0",
+    "MinApiLogCollectorv2Instances": "0",
+    "DesiredApiLogCollectorv2Instances": "0",
+    "MaxApiLogCollectorv2Instances": "0"
+  },
+  "StackPolicy" : {
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "NotAction" : "Update:Delete",
+        "Principal": "*",
+        "Resource" : "*"
+      }
+    ]
+  }
+}
