@@ -530,7 +530,7 @@
           }
         }
       }
-    }
+    },
     "CodePipelineapiLCTemplate": {
       "Type": "AWS::CodePipeline::Pipeline",
       "Properties": {

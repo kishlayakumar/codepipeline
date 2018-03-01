@@ -5,7 +5,42 @@
     "LogCollectorv2InstanceType": "t2.small",
     "MinLogCollectorv2Instances": "0",
     "DesiredLogCollectorv2Instances": "0",
-    "MaxLogCollectorv2Instances": "0"
+    "MaxLogCollectorv2Instances": "0",
+    "ApiLogCollectorv2InstanceType": {
+      "Type": "String",
+      "Default": "t2.small",
+      "AllowedValues": [
+        "t2.small",
+        "t2.medium",
+        "t2.large",
+        "t2.xlarge",
+        "t2.2xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge"
+      ],
+      "Description": "ApiLogcollector EC2 instance type"
+    },
+    "MinApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "DesiredApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "MaxApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    }
   },
   "StackPolicy" : {
     "Statement" : [
