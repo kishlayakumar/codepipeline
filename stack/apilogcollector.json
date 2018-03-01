@@ -1,0 +1,398 @@
+{
+  "Parameters": {
+    "NetworkStack": {
+      "Description": "Name of the stack that this stack references for networking and shared resources",
+      "Default": "",
+      "Type": "String"
+    },
+    "SshKey": {
+      "Description": "Amazon EC2 Key Pair for EC2 instances",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "ApiLogCollectorv2InstanceType": {
+      "Type": "String",
+      "Default": "t2.small",
+      "AllowedValues": [
+        "t2.small",
+        "t2.medium",
+        "t2.large",
+        "t2.xlarge",
+        "t2.2xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge"
+      ],
+      "Description": "ApiLogcollector EC2 instance type"
+    },
+    "MinApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "DesiredApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    },
+    "MaxApiLogCollectorv2Instances": {
+      "Default": "0",
+      "Type": "Number",
+      "MinValue": "0",
+      "MaxValue": "10"
+    }
+  },
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Stack Configuration"
+          },
+          "Parameters": [
+            "NetworkStack",
+            "SshKey"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Api LogCollector autoscaling configuration"
+          },
+          "Parameters": [
+            "ApiLogCollectorv2InstanceType",
+            "MinApiLogCollectorv2Instances",
+            "DesiredApiLogCollectorv2Instances",
+            "MaxApiLogCollectorv2Instances"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "VCPNetworkPrefix": {
+          "default": "Upstream stack name"
+        },
+        "SshKey": {
+          "default": "Default SSH key to associate with instances"
+        },
+        "ApiLogCollectorv2InstanceType": {
+          "default": "Instance type"
+        },
+        "MinApiLogCollectorv2Instances": {
+          "default": "Minimum # of instances"
+        },
+        "DesiredApiLogCollectorv2Instances": {
+          "default": "Desired # of instances"
+        },
+        "MaxApiLogCollectorv2Instances": {
+          "default": "Maximum # of instances"
+        }
+      }
+    }
+  },
+  "Mappings": {
+    "RegionToApiLogCollectorv2AmiMap": {
+      "ap-south-1": {
+        "production": "ami-f9daac96"
+      },
+      "eu-west-1": {
+        "production": "ami-70edb016"
+      }
+    }
+  },
+  "Resources": {
+    "ApiLogCollectorv2Subnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              "a"
+            ]
+          ]
+        },
+        "CidrBlock": {
+          "Fn::Join": [
+            ".",
+            [
+              {
+                "Fn::ImportValue": {
+                  "Fn::Sub": "${NetworkStack}-VpcNetworkPrefix"
+                }
+              },
+              "176.0/20"
+            ]
+          ]
+        },
+        "MapPublicIpOnLaunch": false,
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-VpcId"
+          }
+        }
+      }
+    },
+    "ApiLogCollectorv2SubnetRouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-RouteTableNatId"
+          }
+        },
+        "SubnetId": {
+          "Ref": "ApiLogCollectorv2Subnet"
+        }
+      }
+    },
+    "ApiLogCollectorv2LaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "services": {
+            "sysvint": {
+              "codedeploy-agent": {
+                "enabled": "true",
+                "ensureRunning": "true"
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "AssociatePublicIpAddress": false,
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionToApiLogCollectorv2AmiMap",
+            {
+              "Ref": "AWS::Region"
+            },
+            "production"
+          ]
+        },
+        "IamInstanceProfile": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CdAndEcrInstanceIamProfile"
+          }
+        },
+        "InstanceMonitoring": true,
+        "InstanceType": {
+          "Ref": "ApiLogCollectorv2InstanceType"
+        },
+        "KeyName": {
+          "Ref": "SshKey"
+        },
+        "SecurityGroups": [
+          {
+            "Fn::ImportValue": {
+              "Fn::Sub": "${NetworkStack}-ApiLogCollectorv2InstanceSecurityGroupId"
+            }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash -ex\n",
+                "echo 'apilogcollector' > /etc/node_profile\n",
+                "echo '",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "' > /etc/cfn_stackname\n",
+                "yum update -y aws-cfn-bootstrap\n",
+                "yum install -y aws-cli\n",
+                "yum install -y ruby \n",
+                "yum install -y wget \n",
+                "# Install the AWS CodeDeploy Agent.\n",
+                "cd /home/ec2-user/\n",
+                "wget https://aws-codedeploy-ap-south-1.s3.amazonaws.com/latest/install \n",
+                "chmod +x ./install \n",
+                "./install auto \n",
+                "/opt/aws/bin/cfn-init --stack ",
+                {
+                  "Ref": "AWS::StackId"
+                },
+                " --resource ApiLogCollectorv2LaunchConfiguration ",
+                " --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "ApiLogCollectorv2AutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "Cooldown": 300,
+        "DesiredCapacity": {
+          "Ref": "DesiredApiLogCollectorv2Instances"
+        },
+        "HealthCheckGracePeriod": 60,
+        "HealthCheckType": "EC2",
+        "LaunchConfigurationName": {
+          "Ref": "ApiLogCollectorv2LaunchConfiguration"
+        },
+        "MaxSize": {
+          "Ref": "MaxApiLogCollectorv2Instances"
+        },
+        "MinSize": {
+          "Ref": "MinApiLogCollectorv2Instances"
+        },
+        "MetricsCollection": [
+          {
+            "Granularity": "1Minute",
+            "Metrics": []
+          }
+        ],
+        "TerminationPolicies": [
+          "NewestInstance"
+        ],
+        "VPCZoneIdentifier": [
+          {
+            "Ref": "ApiLogCollectorv2Subnet"
+          }
+        ]
+      }
+    },
+    "ApiLogCollectorv2AutoScalingCloudWatchAlarmCpuHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "ActionsEnabled": true,
+        "AlarmActions": [
+          {
+            "Ref": "ApiLogCollectorv2AutoScalingScaleUpPolicy"
+          }
+        ],
+        "AlarmDescription": "Alarm if CPU too high or metric disappears indicating instance is down",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "ApiLogCollectorv2AutoScalingGroup"
+            }
+          }
+        ],
+        "EvaluationPeriods": "5",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "60",
+        "Threshold": "50"
+      }
+    },
+    "ApiLogCollectorv2AutoScalingCloudWatchAlarmCpuLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "ActionsEnabled": true,
+        "AlarmActions": [
+          {
+            "Ref": "ApiLogCollectorv2AutoScalingScaleDownPolicy"
+          }
+        ],
+        "AlarmDescription": "Alarm if CPU is too low or metric disappears indicating instance is down",
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "ApiLogCollectorv2AutoScalingGroup"
+            }
+          }
+        ],
+        "EvaluationPeriods": "5",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "60",
+        "Threshold": "20"
+      }
+    },
+    "ApiLogCollectorv2AutoScalingScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "ApiLogCollectorv2AutoScalingGroup"
+        },
+        "Cooldown": "300",
+        "ScalingAdjustment": "2"
+      }
+    },
+    "ApiLogCollectorv2AutoScalingScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "ApiLogCollectorv2AutoScalingGroup"
+        },
+        "Cooldown": "300",
+        "ScalingAdjustment": "-1"
+      }
+    },
+    "ApiLogCollectorv2CodeDeployApplication": {
+      "Type": "AWS::CodeDeploy::Application",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              {
+                "Ref": "AWS::Region"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiLogCollectorv2CodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {
+          "Ref": "ApiLogCollectorv2CodeDeployApplication"
+        },
+        "AutoScalingGroups": [
+          {
+            "Ref": "ApiLogCollectorv2AutoScalingGroup"
+          }
+        ],
+        "DeploymentConfigName": "CodeDeployDefault.OneAtATime",
+        "DeploymentGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              {
+                "Ref": "AWS::Region"
+              },
+              "fleet"
+            ]
+          ]
+        },
+        "ServiceRoleArn": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${NetworkStack}-CodeDeployTrustIamRoleArn"
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+  }
+}

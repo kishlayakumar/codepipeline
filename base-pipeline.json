@@ -531,5 +531,121 @@
         }
       }
     }
+    "CodePipelineapiLCTemplate": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "CodePipeline",
+              "apilogcollector",
+              {
+                "Ref": "AWS::Region"
+              }
+            ]
+          ]
+        },
+        "RestartExecutionOnUpdate": false,
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "CodePipelineServiceRole",
+            "Arn"
+          ]
+        },
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "ThirdParty",
+                  "Provider": "GitHub",
+                  "Version": "1"
+                },
+                "Name": "GitHub",
+                "OutputArtifacts": [
+                  {
+                    "Name": "SourceArtifacts"
+                  }
+                ],
+                "RunOrder": 1,
+                "Configuration": {
+                  "Owner":{
+                    "Ref" : "GitHubUser"
+                  },
+                  "Repo": {
+                    "Ref" : "GitHubRepository"
+                  },
+                  "Branch" : {
+                    "Ref" : "GitHubBranch"
+                  },
+                  "OAuthToken" : {
+                    "Ref" : "GitHubOAuthToken"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "Name": "DeployInfrastructure",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Deploy",
+                  "Owner": "AWS",
+                  "Provider": "CloudFormation",
+                  "Version": "1"
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceArtifacts"
+                  }
+                ],
+                "Name": "DeployApiLC",
+                "RunOrder": 1,
+                "Configuration": {
+                  "ActionMode" : "CREATE_UPDATE",
+                  "RoleArn" : {
+                    "Fn::GetAtt": [
+                      "CodePipelineCloudFormationRole",
+                      "Arn"
+                    ]
+                  },
+                  "Capabilities" : "CAPABILITY_NAMED_IAM",
+                  "StackName" : {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        {
+                          "Ref": "StackName"
+                        },
+                        "apilogcollector",
+                        {
+                          "Ref": "AWS::Region"
+                        }
+                      ]
+                    ]
+                  },
+                  "TemplateConfiguration":"SourceArtifacts::stack/logcollector_parameter.json",
+                  "TemplatePath": "SourceArtifacts::stack/apilogcollector.json"
+
+                }
+              }
+            ]
+          }
+        ],
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": {
+            "Ref": "ArtifactsS3Bucket"
+          }
+        }
+      }
+    }
   }
 }
