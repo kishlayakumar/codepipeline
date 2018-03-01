@@ -1,7 +1,7 @@
 {
   "Parameters": {
     "NetworkStack": "in2",
-    "SshKey": "mumbai",s
+    "SshKey": "mumbai",
     "ApiLogCollectorv2InstanceType": "0",
     "MinApiLogCollectorv2Instances": "0",
     "DesiredApiLogCollectorv2Instances": "0",
