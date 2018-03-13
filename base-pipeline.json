@@ -20,9 +20,18 @@
       "Description": "Amazon EC2 Key Pair",
       "Type": "AWS::EC2::KeyPair::KeyName"
     },
+
     "StackName" : {
       "Description": "Name of the stack that this stack references for networking and shared resources",
       "Default": "",
+      "Type": "String"
+    },
+    "Email" : {
+      "Description": "Email id to ask",
+      "Type": "String"
+    },
+    "ChangeSetName":{
+      "Description": "Changeset name",
       "Type": "String"
     }
   },
@@ -37,6 +46,21 @@
     }
   },
   "Resources": {
+    "CodePipelineSNSTopic" : {
+      "Type" : "AWS::SNS::Topic",
+      "Properties" : {
+        "DisplayName" : "Disaster",
+        "Subscription" : [
+          {
+            "Endpoint": {
+              "Ref": "Email"
+            },
+            "Protocol": "email"
+          }
+        ],
+        "TopicName" : "DisasterSubscription"
+      }
+    },
     "ArtifactsS3Bucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
@@ -531,6 +555,7 @@
         }
       }
     },
+
     "CodePipelineapiLCTemplate": {
       "Type": "AWS::CodePipeline::Pipeline",
       "Properties": {
@@ -596,6 +621,81 @@
             "Actions": [
               {
                 "ActionTypeId": {
+                "Category": "Deploy",
+                "Owner": "AWS",
+                "Provider": "CloudFormation",
+                "Version": "1"
+              },
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceArtifacts"
+                  }
+                ],
+              "Name": "CreateChangesetLC",
+                "Configuration": {
+                  "ActionMode" : "CHANGE_SET_REPLACE",
+                  "RoleArn" : {
+                  "Fn::GetAtt": [
+                    "CodePipelineCloudFormationRole",
+                    "Arn"
+                  ]
+                },
+                "Capabilities" : "CAPABILITY_NAMED_IAM",
+                "StackName" : {
+                  "Fn::Join": [
+                    "-",
+                    [
+                      {
+                        "Ref": "StackName"
+                      },
+                      "apilogcollector",
+                      {
+                        "Ref": "AWS::Region"
+                      }
+                    ]
+                  ]
+                },
+                "ChangeSetName":{
+                  "Fn::Join": [
+                    "-",
+                    [
+                      {
+                        "Ref": "StackName"
+                      },
+                      "apilogcollector",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "ChangeSet"
+                    ]
+                  ]
+                },
+                "TemplateConfiguration":"SourceArtifacts::stack/apilogcollector_parameter.json",
+                "TemplatePath": "SourceArtifacts::stack/apilogcollector.json"
+
+              },
+                "RunOrder": "2"
+            },
+              {
+                "ActionTypeId": {
+                  "Category": "Approval",
+                  "Owner": "AWS",
+                  "Provider": "Manual",
+                  "Version": "1"
+                },
+                "Configuration":{
+                  "NotificationArn":{
+                    "Ref" : "CodePipelineSNSTopic"
+                  },
+                  "CustomData" : {
+                    "Fn::Sub" : "A new change set was created for the ${StackName}-apilogcollector stack. Do you want to implement the changes?'"
+                  }
+                },
+                "Name" : "Approval",
+                "RunOrder" : "3"
+              },
+              {
+                "ActionTypeId": {
                   "Category": "Deploy",
                   "Owner": "AWS",
                   "Provider": "CloudFormation",
@@ -607,9 +707,12 @@
                   }
                 ],
                 "Name": "DeployApiLC",
-                "RunOrder": 1,
+                "RunOrder": "4",
                 "Configuration": {
-                  "ActionMode" : "CREATE_UPDATE",
+                  "ActionMode" : "CHANGE_SET_EXECUTE",
+                  "ChangeSetName": {
+                    "Ref" : "ChangeSetName"
+                  },
                   "RoleArn" : {
                     "Fn::GetAtt": [
                       "CodePipelineCloudFormationRole",
@@ -630,10 +733,7 @@
                         }
                       ]
                     ]
-                  },
-                  "TemplateConfiguration":"SourceArtifacts::stack/apilogcollector_parameter.json",
-                  "TemplatePath": "SourceArtifacts::stack/apilogcollector.json"
-
+                  }
                 }
               }
             ]

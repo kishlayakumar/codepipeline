@@ -326,7 +326,7 @@
         "AutoScalingGroupName": {
           "Ref": "ApiLogCollectorv2AutoScalingGroup"
         },
-        "Cooldown": "300",
+        "Cooldown": "200",
         "ScalingAdjustment": "2"
       }
     },
